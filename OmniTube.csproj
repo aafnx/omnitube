@@ -2,7 +2,9 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <!-- CefSharp.OffScreen uses System.Drawing (WinForms framework) -->
+    <UseWindowsForms>true</UseWindowsForms>
     <Nullable>disable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
@@ -19,7 +21,7 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
 
     <!-- Pin with: dotnet publish -p:CefSharpVersion=x.y.z -->
-    <CefSharpVersion Condition="'$(CefSharpVersion)' == ''">*</CefSharpVersion>
+    <CefSharpVersion Condition="'$(CefSharpVersion)' == ''">154.0.340</CefSharpVersion>
   </PropertyGroup>
 
   <ItemGroup>
