@@ -17,7 +17,7 @@ internal static class Leanback
     private const int StarboardVersion = 18;
     private const string Brand = "OmniTube";
     private const string AppId = "omnibox.omnitube";
-    private const string AppVersion = "0.3.0";
+    private const string AppVersion = "0.4.0";
 
     public static readonly string UserAgent =
         $"Mozilla/5.0 (Windows NT 10.0; Win64; x64) Cobalt/{CobaltVersion} (unlike Gecko) v8/{V8Version}-jit gles " +
@@ -47,6 +47,7 @@ internal static class Leanback
     };
 
     public const string ExitMarker = "__OMNITUBE_EXIT__";
+    public const string PlaybackMarker = "__OMNITUBE_PLAYBACK__:";
 
     /// <summary>VacuumTube's page modules, bundled by web/build.mjs and embedded into the exe.</summary>
     public static string LoadVacuumTubeBundle()
@@ -82,6 +83,21 @@ internal static class Leanback
             e.which = code;
             document.dispatchEvent(e);
           };
+
+          // Playback state for the host (keeps the screensaver away while a video plays).
+          // Muted videos (inline previews in menus) don't count.
+          let lastPlaying = null;
+          const reportPlayback = () => {
+            const playing = Array.from(document.querySelectorAll('video'))
+              .some(v => !v.paused && !v.ended && !v.muted);
+            if (playing !== lastPlaying) {
+              lastPlaying = playing;
+              console.log('__OMNITUBE_PLAYBACK__:' + (playing ? 1 : 0));
+            }
+          };
+          for (const type of ['play', 'playing', 'pause', 'ended', 'emptied', 'volumechange'])
+            document.addEventListener(type, () => setTimeout(reportPlayback, 0), true);
+          setInterval(reportPlayback, 5000);
 
           const exit = () => console.log('__OMNITUBE_EXIT__');
           window.close = exit;

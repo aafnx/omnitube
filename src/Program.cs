@@ -18,6 +18,7 @@ internal static class Program
     private const string Title = "OmniTube";
     private const uint TimerId = 1;
     private const uint WM_APP_FALLBACK = WM_APP + 1;
+    private const uint WM_APP_PLAYBACK = WM_APP + 2;
 
     private static string _dataDir;
     private static string _configPath;
@@ -35,6 +36,7 @@ internal static class Program
     private static long _lastMouseMove;
     private static long _browserCreatedAt;
     private static bool _fallbackDone;
+    private static long _lastAwakePulse;
 
     [STAThread]
     private static int Main(string[] args)
@@ -300,6 +302,11 @@ internal static class Program
             Log.Info("Exit requested by YouTube");
             PostMessageW(_hwnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
         }
+        else if (e.Message.StartsWith(Leanback.PlaybackMarker, StringComparison.Ordinal))
+        {
+            bool playing = e.Message.EndsWith("1", StringComparison.Ordinal);
+            PostMessageW(_hwnd, WM_APP_PLAYBACK, playing ? (IntPtr)1 : IntPtr.Zero, IntPtr.Zero);
+        }
         else if (e.Message.StartsWith("[omnitube]", StringComparison.Ordinal))
         {
             Log.Info("page: " + e.Message);
@@ -471,6 +478,10 @@ internal static class Program
                 FallbackToCpuFrames();
                 return IntPtr.Zero;
 
+            case WM_APP_PLAYBACK:
+                if (_config.KeepAwakeWhilePlaying) KeepAwake.Set(wParam != IntPtr.Zero);
+                return IntPtr.Zero;
+
             case WM_KEYDOWN:
             case WM_KEYUP:
             case WM_CHAR:
@@ -545,6 +556,12 @@ internal static class Program
     private static void OnTimer()
     {
         long now = Environment.TickCount64;
+
+        if (now - _lastAwakePulse > 30_000)
+        {
+            _lastAwakePulse = now;
+            KeepAwake.Pulse();
+        }
 
         if (_config.HideCursorAfterSeconds > 0 && _cursorVisible && now - _lastMouseMove > _config.HideCursorAfterSeconds * 1000L)
         {

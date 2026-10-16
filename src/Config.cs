@@ -37,6 +37,12 @@ internal sealed class Config
     public bool VacuumTubeModules { get; set; } = true;
 
     /// <summary>
+    /// While a video plays, keep the display on and hold off screensavers (Steam Big Picture,
+    /// Windows). Released on pause, so the screensaver still works in menus.
+    /// </summary>
+    public bool KeepAwakeWhilePlaying { get; set; } = true;
+
+    /// <summary>
     /// Download new builds from the GitHub release in the background and install them on exit.
     /// </summary>
     public bool AutoUpdate { get; set; } = true;

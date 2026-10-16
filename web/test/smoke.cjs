@@ -70,6 +70,16 @@ setTimeout(() => {
     w.__omni(true, 32780)
     w.__omni(false, 32780)
     w.close()
+
+    // playback: a video starts -> marker 1, pauses -> marker 0
+    const video = w.document.createElement('video')
+    w.document.body.appendChild(video)
+    Object.defineProperty(video, 'paused', { configurable: true, value: false })
+    video.dispatchEvent(new w.Event('playing'))
+    setTimeout(() => {
+        Object.defineProperty(video, 'paused', { configurable: true, value: true })
+        video.dispatchEvent(new w.Event('pause'))
+    }, 100)
 }, 300)
 
 setTimeout(() => {
@@ -84,6 +94,9 @@ setTimeout(() => {
     if (!(keydowns.includes(32768) && keydowns.includes(32780))) fail(`gamepad did not reach Leanback, keydowns: [${keydowns}]`)
     if (!text.some((t) => t.includes('__OMNITUBE_EXIT__'))) fail('exit hook did not fire on window.close()')
 
+    const playback = text.filter((t) => t.includes('__OMNITUBE_PLAYBACK__:')).map((t) => t.slice(-1)).join('')
+    if (!playback.endsWith('10')) fail(`playback markers should end with 1 then 0, got "${playback}"`)
+
     const res = w.h5vcc?.system?.getVideoContainerSizeOverride?.()
     if (res !== '3840x2160') fail(`resolution hint should be 3840x2160 for 1920x1080 @2x, got ${res}`)
 
@@ -94,6 +107,6 @@ setTimeout(() => {
         process.exit(1)
     }
 
-    console.log(`Smoke test passed: ${loaded.replace(/^.*loaded: /, '')} modules, gamepad OK, exit OK, resolution ${res}`)
+    console.log(`Smoke test passed: ${loaded.replace(/^.*loaded: /, '')} modules, gamepad OK, exit OK, playback OK, resolution ${res}`)
     process.exit(0)
 }, 1500)
