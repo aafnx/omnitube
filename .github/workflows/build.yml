@@ -1,0 +1,47 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Publish (win-x64, self-contained)
+        run: dotnet publish OmniTube.csproj -c Release -o publish
+
+      - name: List output
+        shell: pwsh
+        run: Get-ChildItem publish | Select-Object Name, Length | Format-Table -AutoSize
+
+      - name: Zip
+        shell: pwsh
+        run: Compress-Archive -Path publish/* -DestinationPath OmniTube-win-x64.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OmniTube-win-x64
+          path: OmniTube-win-x64.zip
+
+      - name: Publish "latest" release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Continue'
+          gh release delete latest --yes --cleanup-tag 2>$null
+          gh release create latest OmniTube-win-x64.zip --target $env:GITHUB_SHA --prerelease `
+            --title "OmniTube (latest build)" `
+            --notes "Automatic build of $env:GITHUB_SHA"
+          exit $LASTEXITCODE

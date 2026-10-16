@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>OmniTube</AssemblyName>
+    <RootNamespace>OmniTube</RootNamespace>
+    <Version>0.1.0</Version>
+
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+
+    <!-- Pin with: dotnet publish -p:CefSharpVersion=x.y.z -->
+    <CefSharpVersion Condition="'$(CefSharpVersion)' == ''">*</CefSharpVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CefSharp.OffScreen.NETCore" Version="$(CefSharpVersion)" />
+  </ItemGroup>
+
+</Project>
