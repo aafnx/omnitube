@@ -30,6 +30,12 @@ internal sealed class Config
     /// <summary>Accept-Language, e.g. "ru-RU,ru,en". Empty = Windows UI language.</summary>
     public string Language { get; set; } = "";
 
+    /// <summary>
+    /// Load VacuumTube's page modules: ad block, SponsorBlock, DeArrow, dislikes, hide Shorts, etc.
+    /// Their settings are inside YouTube: Settings -> VacuumTube.
+    /// </summary>
+    public bool VacuumTubeModules { get; set; } = true;
+
     /// <summary>Hide the mouse cursor after this many seconds without movement (0 = never hide).</summary>
     public int HideCursorAfterSeconds { get; set; } = 3;
 

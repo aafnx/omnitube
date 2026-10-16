@@ -4,3 +4,5 @@ publish/
 *.zip
 .vs/
 *.user
+web/node_modules/
+web/dist/

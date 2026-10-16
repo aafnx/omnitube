@@ -17,7 +17,7 @@ internal static class Leanback
     private const int StarboardVersion = 18;
     private const string Brand = "OmniTube";
     private const string AppId = "omnibox.omnitube";
-    private const string AppVersion = "0.1.0";
+    private const string AppVersion = "0.2.0";
 
     public static readonly string UserAgent =
         $"Mozilla/5.0 (Windows NT 10.0; Win64; x64) Cobalt/{CobaltVersion} (unlike Gecko) v8/{V8Version}-jit gles " +
@@ -48,6 +48,15 @@ internal static class Leanback
 
     public const string ExitMarker = "__OMNITUBE_EXIT__";
 
+    /// <summary>VacuumTube's page modules, bundled by web/build.mjs and embedded into the exe.</summary>
+    public static string LoadVacuumTubeBundle()
+    {
+        using var stream = typeof(Leanback).Assembly.GetManifestResourceStream("vacuumtube.bundle.js");
+        if (stream == null) return null;
+        using var reader = new System.IO.StreamReader(stream, System.Text.Encoding.UTF8);
+        return reader.ReadToEnd();
+    }
+
     /// <summary>
     /// Injected into every main-frame load:
     ///  - __omni(down, code): dispatches a Leanback key event (used by the native gamepad reader);
@@ -59,7 +68,15 @@ internal static class Leanback
           if (window.__omniInstalled) return;
           window.__omniInstalled = true;
 
+          // Native gamepad bridge. With VacuumTube's modules loaded, events go through its
+          // controller pipeline (controller-support.js, settings overlay navigation);
+          // otherwise they become Leanback key events directly.
           window.__omni = (down, code) => {
+            const controller = window.__omniController;
+            if (controller) {
+              controller.emit(down ? 'down' : 'up', { code });
+              return;
+            }
             const e = new Event(down ? 'keydown' : 'keyup');
             e.keyCode = code;
             e.which = code;
@@ -70,6 +87,7 @@ internal static class Leanback
           window.close = exit;
 
           const hook = setInterval(() => {
+            if (window.__omniVtLoaded) { clearInterval(hook); return; } // VacuumTube's fix-exit handles it
             const yttv = window._yttv;
             if (!yttv) return;
             for (const key in yttv) {

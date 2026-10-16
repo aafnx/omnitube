@@ -1,0 +1,14 @@
+{
+  "name": "omnitube-web",
+  "private": true,
+  "type": "module",
+  "description": "Bundles VacuumTube's page-side modules for injection into OmniTube (CEF)",
+  "scripts": {
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "events": "^3.3.0",
+    "path-browserify": "^1.0.1"
+  }
+}

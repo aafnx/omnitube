@@ -11,18 +11,30 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>OmniTube</AssemblyName>
     <RootNamespace>OmniTube</RootNamespace>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
 
     <PlatformTarget>x64</PlatformTarget>
     <Platforms>x64</Platforms>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>assets\app.ico</ApplicationIcon>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
 
     <!-- Pin with: dotnet publish -p:CefSharpVersion=x.y.z -->
     <CefSharpVersion Condition="'$(CefSharpVersion)' == ''">154.0.340</CefSharpVersion>
   </PropertyGroup>
+
+  <!-- VacuumTube page modules, built by: cd web && npm ci && node build.mjs -->
+  <ItemGroup>
+    <EmbeddedResource Include="web/dist/vacuumtube.bundle.js" LogicalName="vacuumtube.bundle.js" Condition="Exists('web/dist/vacuumtube.bundle.js')" />
+    <Compile Remove="web/**;third_party/**" />
+    <None Remove="web/**;third_party/**" />
+  </ItemGroup>
+
+  <Target Name="WarnMissingBundle" BeforeTargets="Build" Condition="!Exists('web/dist/vacuumtube.bundle.js')">
+    <Warning Text="web/dist/vacuumtube.bundle.js not found — building without VacuumTube modules. Run: cd web &amp;&amp; npm ci &amp;&amp; node build.mjs" />
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="CefSharp.OffScreen.NETCore" Version="$(CefSharpVersion)" />

@@ -214,9 +214,51 @@ internal static class Program
                 Log.Warn("User agent override failed, continuing with plain UA: " + ex.Message);
             }
 
+            if (_devTools != null) await InstallPageScriptsAsync();
+
             Log.Info("Loading " + _config.Url);
             browser.Load(_config.Url);
         }, TaskScheduler.Default);
+    }
+
+    /// <summary>
+    /// Registers our page script (gamepad bridge, exit hook) plus VacuumTube's modules (ad block,
+    /// SponsorBlock, DeArrow, ...) to run in every new document before YouTube's own scripts.
+    /// CSP is bypassed so those modules can reach their APIs (sponsor.ajay.app etc.), as VacuumTube does.
+    /// </summary>
+    private static async Task InstallPageScriptsAsync()
+    {
+        try
+        {
+            await _devTools.Page.EnableAsync();
+            await _devTools.Page.SetBypassCSPAsync(true);
+
+            string script = Leanback.InjectScript;
+            if (_config.VacuumTubeModules)
+            {
+                string bundle = Leanback.LoadVacuumTubeBundle();
+                if (bundle != null)
+                {
+                    script += "\n;\n" + bundle;
+                    Log.Info($"VacuumTube modules: {bundle.Length / 1024} KB");
+                }
+                else
+                {
+                    Log.Warn("VacuumTube bundle is missing from this build");
+                }
+            }
+            else
+            {
+                Log.Info("VacuumTube modules disabled in config.json");
+            }
+
+            await _devTools.Page.AddScriptToEvaluateOnNewDocumentAsync(script);
+            Log.Info("Page scripts installed");
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Installing page scripts failed: " + ex.Message);
+        }
     }
 
     private static void FallbackToCpuFrames()
@@ -240,10 +282,16 @@ internal static class Program
 
     private static void OnConsoleMessage(object sender, ConsoleMessageEventArgs e)
     {
-        if (e.Message != null && e.Message.Contains(Leanback.ExitMarker))
+        if (e.Message == null) return;
+
+        if (e.Message.Contains(Leanback.ExitMarker))
         {
             Log.Info("Exit requested by YouTube");
             PostMessageW(_hwnd, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+        }
+        else if (e.Message.StartsWith("[omnitube]", StringComparison.Ordinal))
+        {
+            Log.Info("page: " + e.Message);
         }
     }
 
@@ -254,18 +302,20 @@ internal static class Program
         e.Frame.ExecuteJavaScriptAsync(Leanback.InjectScript);
     }
 
-    private static void SendGamepadKey(bool down, int code)
+    private static void SendGamepadKey(bool down, int code) =>
+        RunInPage($"window.__omni && window.__omni({(down ? "true" : "false")}, {code})");
+
+    private static void RunInPage(string js)
     {
         var browser = _browser;
         if (browser == null || !browser.IsBrowserInitialized) return;
         try
         {
-            browser.GetBrowser()?.MainFrame?.ExecuteJavaScriptAsync(
-                $"window.__omni && window.__omni({(down ? "true" : "false")}, {code})");
+            browser.GetBrowser()?.MainFrame?.ExecuteJavaScriptAsync(js);
         }
         catch (Exception ex)
         {
-            Log.Warn("Gamepad dispatch failed: " + ex.Message);
+            Log.Warn("Page call failed: " + ex.Message);
         }
     }
 
@@ -294,6 +344,8 @@ internal static class Program
             style = CS_HREDRAW | CS_VREDRAW,
             lpfnWndProc = (IntPtr)(delegate* unmanaged<IntPtr, uint, IntPtr, IntPtr, IntPtr>)&WndProc,
             hInstance = instance,
+            hIcon = LoadIconW(instance, (IntPtr)32512), // ApplicationIcon (Roslyn embeds it as icon group 32512)
+            hIconSm = LoadIconW(instance, (IntPtr)32512),
             hCursor = IntPtr.Zero, // managed in WM_SETCURSOR
             lpszClassName = className,
         };
@@ -372,6 +424,11 @@ internal static class Program
 
             case WM_SETFOCUS:
                 Host?.SetFocus(true);
+                return IntPtr.Zero;
+
+            case WM_ACTIVATEAPP:
+                // VacuumTube's "pause on blur" listens for these
+                RunInPage($"window.__omniIpcEmit && window.__omniIpcEmit('{(wParam != IntPtr.Zero ? "focus" : "blur")}')");
                 return IntPtr.Zero;
 
             case WM_SETCURSOR:

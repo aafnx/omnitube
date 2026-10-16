@@ -12,6 +12,7 @@ internal static unsafe class Native
     public const uint WM_SETFOCUS = 0x0007;
     public const uint WM_CLOSE = 0x0010;
     public const uint WM_ERASEBKGND = 0x0014;
+    public const uint WM_ACTIVATEAPP = 0x001C;
     public const uint WM_SETCURSOR = 0x0020;
     public const uint WM_KEYDOWN = 0x0100;
     public const uint WM_KEYUP = 0x0101;
@@ -147,6 +148,9 @@ internal static unsafe class Native
 
     [DllImport("user32.dll")]
     public static extern IntPtr SetCursor(IntPtr cursor);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr LoadIconW(IntPtr instance, IntPtr iconName);
 
     [DllImport("user32.dll")]
     public static extern IntPtr SetTimer(IntPtr hwnd, IntPtr id, uint elapse, IntPtr timerProc);
