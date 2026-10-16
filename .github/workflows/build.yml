@@ -25,6 +25,7 @@ jobs:
         run: |
           npm ci
           node build.mjs
+          node test/smoke.cjs
 
       - uses: actions/setup-dotnet@v4
         with:

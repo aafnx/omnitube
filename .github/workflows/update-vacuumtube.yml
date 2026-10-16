@@ -1,0 +1,123 @@
+name: update VacuumTube
+
+# Weekly: if VacuumTube has a newer release, move the submodule to it, rebuild the bundle,
+# run the smoke test, and on success commit to main and start a release build.
+# On failure: open (or update) an issue so the owner gets notified.
+
+on:
+  schedule:
+    - cron: '17 5 * * 1' # Mondays 05:17 UTC
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'VacuumTube tag or commit to use (empty = latest release tag)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+concurrency:
+  group: update-vacuumtube
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+
+      - name: Find target VacuumTube version
+        id: target
+        shell: bash
+        run: |
+          cd third_party/VacuumTube
+          if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then git fetch --quiet --unshallow origin; fi
+          git fetch --quiet --tags origin
+          current=$(git rev-parse HEAD)
+          if [ -n "${{ github.event.inputs.ref }}" ]; then
+            target="${{ github.event.inputs.ref }}"
+          else
+            # newest vX.Y.Z tag (no pre-releases)
+            target=$(git tag --list 'v[0-9]*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
+          fi
+          target_sha=$(git rev-parse "$target^{commit}")
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          echo "target=$target" >> "$GITHUB_OUTPUT"
+          echo "target_sha=$target_sha" >> "$GITHUB_OUTPUT"
+          if [ "$target_sha" = "$current" ] || git merge-base --is-ancestor "$target_sha" "$current"; then
+            echo "update=false" >> "$GITHUB_OUTPUT"
+            echo "Already on $target or newer (submodule at ${current:0:7})"
+          else
+            echo "update=true" >> "$GITHUB_OUTPUT"
+            echo "Updating ${current:0:7} -> $target (${target_sha:0:7})"
+          fi
+
+      - name: Check out new version
+        if: steps.target.outputs.update == 'true'
+        run: git -C third_party/VacuumTube checkout --quiet "${{ steps.target.outputs.target_sha }}"
+
+      - uses: actions/setup-node@v4
+        if: steps.target.outputs.update == 'true'
+        with:
+          node-version: '22'
+
+      - name: Build bundle and run smoke test
+        id: test
+        if: steps.target.outputs.update == 'true'
+        working-directory: web
+        shell: bash
+        run: |
+          set -o pipefail
+          npm ci 2>&1 | tail -n 5
+          { node build.mjs && node test/smoke.cjs; } 2>&1 | tee ../update.log
+
+      - name: Commit and start release build
+        if: steps.target.outputs.update == 'true' && success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add third_party/VacuumTube
+          git commit -m "Update VacuumTube to ${{ steps.target.outputs.target }}" \
+                     -m "Automatic update: bundle built and smoke test passed."
+          git push origin HEAD:main
+          # pushes made with GITHUB_TOKEN don't trigger workflows; dispatch the build explicitly
+          gh workflow run build.yml --ref main
+          # close a failure issue left over from an earlier attempt
+          for n in $(gh issue list --state open --label vacuumtube-update --json number --jq '.[].number'); do
+            gh issue close "$n" --comment "Fixed: updated to ${{ steps.target.outputs.target }}."
+          done
+
+      - name: Report failure
+        if: failure() && steps.target.outputs.update == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh label create vacuumtube-update --color D93F0B --description "Automatic VacuumTube update failed" 2>/dev/null || true
+          title="VacuumTube ${{ steps.target.outputs.target }}: automatic update failed"
+          {
+            echo "The weekly update to VacuumTube **${{ steps.target.outputs.target }}** did not pass."
+            echo
+            echo "OmniTube stays on the previous version (submodule \`${{ steps.target.outputs.current }}\`), nothing was released."
+            echo
+            echo "Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo
+            echo '```'
+            tail -n 60 update.log 2>/dev/null || echo "(no log)"
+            echo '```'
+          } > body.md
+          existing=$(gh issue list --state open --label vacuumtube-update --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file body.md
+          else
+            gh issue create --title "$title" --label vacuumtube-update --body-file body.md
+          fi

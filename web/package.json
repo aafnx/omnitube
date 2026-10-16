@@ -4,11 +4,13 @@
   "type": "module",
   "description": "Bundles VacuumTube's page-side modules for injection into OmniTube (CEF)",
   "scripts": {
-    "build": "node build.mjs"
+    "build": "node build.mjs",
+    "test": "node test/smoke.cjs"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",
     "events": "^3.3.0",
+    "jsdom": "^24.1.3",
     "path-browserify": "^1.0.1"
   }
 }
