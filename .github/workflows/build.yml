@@ -19,7 +19,17 @@ jobs:
           dotnet-version: '8.0.x'
 
       - name: Publish (win-x64, self-contained)
-        run: dotnet publish OmniTube.csproj -c Release -o publish
+        shell: pwsh
+        run: |
+          dotnet publish OmniTube.csproj -c Release -o publish 2>&1 | Tee-Object -FilePath build.log
+          $code = $LASTEXITCODE
+          # surface errors/warnings as annotations (readable through the API without log access)
+          Select-String -Path build.log -Pattern ': (error|warning) ' | Select-Object -First 40 | ForEach-Object {
+            $line = $_.Line -replace '%','%25' -replace "`r",'' -replace "`n",' '
+            if ($line -match ': error ') { "::error::$line" } else { "::warning::$line" }
+          }
+          Select-String -Path build.log -Pattern 'CefSharp.*\d+\.\d+\.\d+' | Select-Object -First 3 | ForEach-Object { "::notice::$($_.Line)" }
+          exit $code
 
       - name: List output
         shell: pwsh
