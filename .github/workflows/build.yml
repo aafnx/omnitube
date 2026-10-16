@@ -34,7 +34,7 @@ jobs:
       - name: Publish (win-x64, self-contained)
         shell: pwsh
         run: |
-          dotnet publish OmniTube.csproj -c Release -o publish 2>&1 | Tee-Object -FilePath build.log
+          dotnet publish OmniTube.csproj -c Release -o publish -p:SourceRevisionId=$env:GITHUB_SHA 2>&1 | Tee-Object -FilePath build.log
           $code = $LASTEXITCODE
           # surface errors/warnings as annotations (readable through the API without log access)
           Select-String -Path build.log -Pattern ': (error|warning) ' | Select-Object -First 40 | ForEach-Object {

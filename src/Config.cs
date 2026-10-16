@@ -36,6 +36,14 @@ internal sealed class Config
     /// </summary>
     public bool VacuumTubeModules { get; set; } = true;
 
+    /// <summary>
+    /// Download new builds from the GitHub release in the background and install them on exit.
+    /// </summary>
+    public bool AutoUpdate { get; set; } = true;
+
+    /// <summary>GitHub repository with the "latest" release.</summary>
+    public string UpdateRepo { get; set; } = "aafnx/omnitube";
+
     /// <summary>Hide the mouse cursor after this many seconds without movement (0 = never hide).</summary>
     public int HideCursorAfterSeconds { get; set; } = 3;
 

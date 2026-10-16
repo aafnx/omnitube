@@ -56,6 +56,8 @@ internal static class Program
 
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
+        Updater.Init(_dataDir, _config.UpdateRepo);
+
         using var mutex = new Mutex(true, @"Local\OmniTube.SingleInstance", out bool firstInstance);
         if (!firstInstance)
         {
@@ -67,6 +69,7 @@ internal static class Program
 
         try
         {
+            Updater.CollectOldFiles();
             return Run();
         }
         catch (Exception ex)
@@ -93,6 +96,13 @@ internal static class Program
         _gamepad = new Gamepad(SendGamepadKey, () => GetForegroundWindow() == _hwnd);
         _gamepad.Start();
 
+        if (_config.AutoUpdate)
+            Updater.StartBackgroundChecks(_ => ShowToast(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ru"
+                ? "OmniTube: обновление загружено, установится после выхода"
+                : "OmniTube: update downloaded, it will be installed when you exit"));
+        else
+            Log.Info("Auto-update disabled in config.json");
+
         SetTimer(_hwnd, (IntPtr)TimerId, 1000, IntPtr.Zero);
 
         while (GetMessageW(out MSG msg, IntPtr.Zero, 0, 0) > 0)
@@ -107,6 +117,7 @@ internal static class Program
         _browser?.Dispose();
         Cef.Shutdown();
         _renderer?.Dispose();
+        if (_config.AutoUpdate) Updater.ApplyStagedUpdate();
         Log.Info("Bye");
         return 0;
     }
@@ -300,6 +311,19 @@ internal static class Program
         if (!e.Frame.IsMain) return;
         Log.Info($"Loaded {e.Url} (HTTP {e.HttpStatusCode})");
         e.Frame.ExecuteJavaScriptAsync(Leanback.InjectScript);
+    }
+
+    /// <summary>Small notice in the corner of the page, OMNIBOX colours.</summary>
+    private static void ShowToast(string message)
+    {
+        string text = System.Text.Json.JsonSerializer.Serialize(message);
+        RunInPage("(() => { const d = document.createElement('div'); d.textContent = " + text + "; " +
+                  "Object.assign(d.style, { position: 'fixed', right: '48px', bottom: '48px', zIndex: '2147483647', " +
+                  "padding: '18px 28px', borderRadius: '14px', background: 'rgba(10,12,31,0.92)', color: '#DEE4EE', " +
+                  "font: '500 22px/1.3 Roboto, Arial, sans-serif', border: '1px solid rgba(124,108,255,0.6)', " +
+                  "boxShadow: '0 8px 32px rgba(0,0,0,0.5)', transition: 'opacity 0.4s' }); " +
+                  "document.body.appendChild(d); " +
+                  "setTimeout(() => { d.style.opacity = '0'; setTimeout(() => d.remove(), 500); }, 8000); })()");
     }
 
     private static void SendGamepadKey(bool down, int code) =>

@@ -17,7 +17,7 @@ internal static class Leanback
     private const int StarboardVersion = 18;
     private const string Brand = "OmniTube";
     private const string AppId = "omnibox.omnitube";
-    private const string AppVersion = "0.2.0";
+    private const string AppVersion = "0.3.0";
 
     public static readonly string UserAgent =
         $"Mozilla/5.0 (Windows NT 10.0; Win64; x64) Cobalt/{CobaltVersion} (unlike Gecko) v8/{V8Version}-jit gles " +
