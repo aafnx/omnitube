@@ -52,10 +52,10 @@ jobs:
           echo "target_sha=$target_sha" >> "$GITHUB_OUTPUT"
           if [ "$target_sha" = "$current" ] || git merge-base --is-ancestor "$target_sha" "$current"; then
             echo "update=false" >> "$GITHUB_OUTPUT"
-            echo "Already on $target or newer (submodule at ${current:0:7})"
+            echo "::notice::VacuumTube is up to date: already on $target or newer (submodule at ${current:0:7})"
           else
             echo "update=true" >> "$GITHUB_OUTPUT"
-            echo "Updating ${current:0:7} -> $target (${target_sha:0:7})"
+            echo "::notice::Updating VacuumTube ${current:0:7} -> $target (${target_sha:0:7})"
           fi
 
       - name: Check out new version
