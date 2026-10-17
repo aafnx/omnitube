@@ -53,6 +53,7 @@ if (!w.crypto.randomUUID) w.crypto.randomUUID = () => '00000000-0000-4000-8000-0
 Object.defineProperty(w.screen, 'width', { value: 1920 })
 Object.defineProperty(w.screen, 'height', { value: 1080 })
 w.devicePixelRatio = 2 // 4K TV at 200%
+w.HTMLMediaElement.prototype.play = function () { return Promise.resolve() } // jsdom: "not implemented"
 
 try {
     w.eval(bridge + '\n;\n' + bundle)
@@ -80,6 +81,20 @@ setTimeout(() => {
         Object.defineProperty(video, 'paused', { configurable: true, value: true })
         video.dispatchEvent(new w.Event('pause'))
     }, 100)
+
+    // same inside a shadow root (media events don't reach document there): tracked via play()
+    setTimeout(() => {
+        const host = w.document.createElement('div')
+        w.document.body.appendChild(host)
+        const shadowVideo = w.document.createElement('video')
+        host.attachShadow({ mode: 'closed' }).appendChild(shadowVideo)
+        Object.defineProperty(shadowVideo, 'paused', { configurable: true, value: false })
+        shadowVideo.play()
+        setTimeout(() => {
+            Object.defineProperty(shadowVideo, 'paused', { configurable: true, value: true })
+            shadowVideo.dispatchEvent(new w.Event('pause'))
+        }, 100)
+    }, 300)
 }, 300)
 
 setTimeout(() => {
@@ -95,7 +110,7 @@ setTimeout(() => {
     if (!text.some((t) => t.includes('__OMNITUBE_EXIT__'))) fail('exit hook did not fire on window.close()')
 
     const playback = text.filter((t) => t.includes('__OMNITUBE_PLAYBACK__:')).map((t) => t.slice(-1)).join('')
-    if (!playback.endsWith('10')) fail(`playback markers should end with 1 then 0, got "${playback}"`)
+    if (!playback.endsWith('1010')) fail(`playback markers should end with 1010 (light DOM, then shadow DOM), got "${playback}"`)
 
     const res = w.h5vcc?.system?.getVideoContainerSizeOverride?.()
     if (res !== '3840x2160') fail(`resolution hint should be 3840x2160 for 1920x1080 @2x, got ${res}`)

@@ -81,10 +81,34 @@ internal static class KeepAwake
         }
     }
 
-    /// <summary>Called periodically while playing: also resets the system idle timer.</summary>
+    /// <summary>dwExtraInfo of our synthetic input, so the window can ignore it.</summary>
+    public static readonly IntPtr SyntheticInputTag = new(0x4F4D4E49); // "OMNI"
+
+    private static long _pulses;
+
+    /// <summary>
+    /// Called every ~20 s while playing. Besides the power request, sends a zero-distance mouse
+    /// move: it resets the system "last input" idle time, which is what idle timers that only
+    /// count user input (like Steam's screensaver timer) look at. The pointer does not move.
+    /// </summary>
     public static void Pulse()
     {
-        if (_active) Native.SetThreadExecutionState(Native.ES_DISPLAY_REQUIRED | Native.ES_SYSTEM_REQUIRED);
+        if (!_active) return;
+
+        Native.SetThreadExecutionState(Native.ES_DISPLAY_REQUIRED | Native.ES_SYSTEM_REQUIRED);
+
+        var input = new Native.INPUT
+        {
+            type = Native.INPUT_MOUSE,
+            mi = new Native.MOUSEINPUT { dx = 0, dy = 0, dwFlags = Native.MOUSEEVENTF_MOVE, dwExtraInfo = SyntheticInputTag },
+        };
+        uint sent = Native.SendInput(1, new[] { input }, Marshal.SizeOf<Native.INPUT>());
+
+        _pulses++;
+        if (sent != 1)
+            Log.Warn($"SendInput failed: {Marshal.GetLastWin32Error()}");
+        else if (_pulses == 1 || _pulses % 90 == 0)
+            Log.Info($"Idle timer reset while playing (pulse #{_pulses})");
     }
 
     private static void EnsureRequest()

@@ -17,7 +17,7 @@ internal static class Leanback
     private const int StarboardVersion = 18;
     private const string Brand = "OmniTube";
     private const string AppId = "omnibox.omnitube";
-    private const string AppVersion = "0.4.0";
+    private const string AppVersion = "0.4.1";
 
     public static readonly string UserAgent =
         $"Mozilla/5.0 (Windows NT 10.0; Win64; x64) Cobalt/{CobaltVersion} (unlike Gecko) v8/{V8Version}-jit gles " +
@@ -85,18 +85,37 @@ internal static class Leanback
           };
 
           // Playback state for the host (keeps the screensaver away while a video plays).
-          // Muted videos (inline previews in menus) don't count.
+          // Muted videos (inline previews in menus) don't count. Every media element that is
+          // ever played is tracked through HTMLMediaElement.prototype.play, so players inside
+          // shadow DOM (where media events never reach document) are seen too.
+          const mediaEvents = ['play', 'playing', 'pause', 'ended', 'emptied', 'volumechange'];
+          const media = new Set();
           let lastPlaying = null;
           const reportPlayback = () => {
-            const playing = Array.from(document.querySelectorAll('video'))
-              .some(v => !v.paused && !v.ended && !v.muted);
+            let playing = false;
+            for (const v of new Set([...media, ...document.querySelectorAll('video')])) {
+              if (!v.isConnected) { media.delete(v); continue; }
+              if (v instanceof HTMLVideoElement && !v.paused && !v.ended && !v.muted) { playing = true; break; }
+            }
             if (playing !== lastPlaying) {
               lastPlaying = playing;
               console.log('__OMNITUBE_PLAYBACK__:' + (playing ? 1 : 0));
             }
           };
-          for (const type of ['play', 'playing', 'pause', 'ended', 'emptied', 'volumechange'])
-            document.addEventListener(type, () => setTimeout(reportPlayback, 0), true);
+          const schedule = () => setTimeout(reportPlayback, 0);
+          const track = (el) => {
+            if (!el || media.has(el)) return;
+            media.add(el);
+            for (const type of mediaEvents) el.addEventListener(type, schedule);
+          };
+          const originalPlay = HTMLMediaElement.prototype.play;
+          HTMLMediaElement.prototype.play = function (...args) {
+            try { track(this); } catch (_) {}
+            const result = originalPlay.apply(this, args);
+            schedule();
+            return result;
+          };
+          for (const type of mediaEvents) document.addEventListener(type, (e) => { track(e.target); schedule(); }, true);
           setInterval(reportPlayback, 5000);
 
           const exit = () => console.log('__OMNITUBE_EXIT__');

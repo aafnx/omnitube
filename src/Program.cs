@@ -37,6 +37,7 @@ internal static class Program
     private static long _browserCreatedAt;
     private static bool _fallbackDone;
     private static long _lastAwakePulse;
+    private static IntPtr _lastMousePos = new(-1);
 
     [STAThread]
     private static int Main(string[] args)
@@ -495,6 +496,9 @@ internal static class Program
                 return null; // let DefWindowProc handle Alt+F4
 
             case WM_MOUSEMOVE:
+                // ignore our own keep-awake pulses and moves that don't change the position
+                if (GetMessageExtraInfo() == KeepAwake.SyntheticInputTag || lParam == _lastMousePos) return IntPtr.Zero;
+                _lastMousePos = lParam;
                 ShowCursorNow();
                 Host?.SendMouseMoveEvent(MouseAt(lParam), false);
                 return IntPtr.Zero;
@@ -557,7 +561,7 @@ internal static class Program
     {
         long now = Environment.TickCount64;
 
-        if (now - _lastAwakePulse > 30_000)
+        if (now - _lastAwakePulse > 20_000)
         {
             _lastAwakePulse = now;
             KeepAwake.Pulse();
